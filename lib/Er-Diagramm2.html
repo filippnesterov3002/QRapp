@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>ER Diagram</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+    }
+
+    #erd {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    svg {
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="erd"></div>
+
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+
+const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+await document.fonts.ready;
+
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  er: {
+    layoutDirection: 'LR',
+  },
+
+  themeVariables: {
+    darkMode: dark,
+
+    primaryColor: '#ffffff',
+    primaryTextColor: '#333333',
+    primaryBorderColor: '#A80000',
+
+    lineColor: '#666666',
+    textColor: '#333333',
+
+    fontFamily: 'Arial',
+    fontSize: '14px',
+
+    entityBorder: '#A80000',
+    entityFill: '#ffffff',
+
+    attributeFillColorOdd: '#fafafa',
+    attributeFillColorEven: '#f3f3f3',
+  }
+});
+
+const diagram = `
+erDiagram
+
+  ITEM {
+    string itemId PK
+    string name
+    string categoryKey FK
+    string roomId FK
+    int quantity
+    string imagePath
+    datetime createdAt
+    datetime updatedAt
+  }
+
+  ROOM {
+    string roomId PK
+    string name
+    string floor
+  }
+
+  CATEGORY {
+    string key PK
+    string name
+    string icon
+    string accountingType
+  }
+
+  INVENTORY_SESSION {
+    string sessionId PK
+    datetime date
+    string status
+    string rooms
+  }
+
+  INVENTORY_RESULT {
+    string resultId PK
+    string sessionId FK
+    string itemId FK
+    string itemName
+    string room
+    int expectedQty
+    int actualQty
+    string status
+  }
+
+  QR_CODE {
+    string itemId FK
+    string qrData
+    datetime generatedAt
+  }
+
+  EXPORT_LOG {
+    string logId PK
+    datetime exportedAt
+    string format
+    string rooms
+    int totalItems
+  }
+
+  ROOM ||--o{ ITEM : "содержит"
+
+  CATEGORY ||--o{ ITEM : "классифицирует"
+
+  ITEM ||--|| QR_CODE : "имеет"
+
+  ROOM }o--o{ EXPORT_LOG : "выгружается в"
+
+  ITEM }o--o{ EXPORT_LOG : "экспортируется в"
+
+  INVENTORY_SESSION ||--o{ INVENTORY_RESULT : "включает"
+
+  ITEM ||--o{ INVENTORY_RESULT : "проверяется в"
+`;
+
+const { svg } = await mermaid.render('erd-svg', diagram);
+
+document.getElementById('erd').innerHTML = svg;
+
+/*
+  Скругление блоков таблиц
+*/
+document.querySelectorAll('#erd svg.erDiagram .node').forEach(node => {
+
+  const firstPath = node.querySelector('path[d]');
+
+  if (!firstPath) return;
+
+  const d = firstPath.getAttribute('d');
+
+  const nums = d.match(/-?[\\d.]+/g)?.map(Number);
+
+  if (!nums || nums.length < 8) return;
+
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+
+  const w = Math.max(...xs) - x;
+  const h = Math.max(...ys) - y;
+
+  const rect = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'rect'
+  );
+
+  rect.setAttribute('x', x);
+  rect.setAttribute('y', y);
+
+  rect.setAttribute('width', w);
+  rect.setAttribute('height', h);
+
+  rect.setAttribute('rx', '10');
+
+  for (const attr of [
+    'fill',
+    'stroke',
+    'stroke-width',
+    'class',
+    'style'
+  ]) {
+    if (firstPath.hasAttribute(attr)) {
+      rect.setAttribute(attr, firstPath.getAttribute(attr));
+    }
+  }
+
+  firstPath.replaceWith(rect);
+});
+
+/*
+  Убираем линии между строками
+*/
+document.querySelectorAll(
+  '#erd svg.erDiagram .row-rect-odd path, #erd svg.erDiagram .row-rect-even path'
+).forEach(path => {
+  path.setAttribute('stroke', 'none');
+});
+</script>
+
+</body>
+</html>

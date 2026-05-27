@@ -1,0 +1,106 @@
+{
+  "schema_version": "1.0",
+  "app": "inventory",
+  "axioma_version": "3.0",
+  "description": "Схема интеграции с Аксиома (Интерпроком) — маппинг полей и формат файла обмена",
+  "exported_at": "",
+  "organization": "",
+
+  "mapping": {
+    "item_id":           "assetnum",
+    "inventory_number":  "x_inventarnum",
+    "name":              "description",
+    "category_id":       "classstructureid",
+    "location_room":     "reatroom",
+    "location_code":     "location",
+    "quantity":          "orderqty",
+    "created_at":        "installdate",
+    "updated_at":        "changedate"
+  },
+
+  "field_notes": {
+    "assetnum":         "Бизнес-ключ актива (varchar 12), уникален в рамках siteid. Соответствует артикулу/инв. ключу в нашем приложении.",
+    "x_inventarnum":    "Фактический инвентарный номер (varchar 50) — кастомное поле Аксиомы. Дублирует assetnum если специальной нумерации нет.",
+    "description":      "Наименование/описание актива (varchar 500) — поле axioma.asset.description.",
+    "classstructureid": "Код классификатора категории (varchar 20) → JOIN axioma.classstructure для получения текстового названия.",
+    "reatroom":         "Название помещения/кабинета (varchar 30) — кастомное поле модуля REAT. Альтернатива: axiroom (модуль AXI).",
+    "axiroom":          "Аналог reatroom для модуля AXI (varchar 30).",
+    "reatbuilding":     "Название здания (varchar 30) — кастомное поле REAT. Альтернатива: axibuilding.",
+    "location":         "Код местонахождения из справочника axioma.locations (varchar 30). Человеко-читаемое название в locations.description.",
+    "orderqty":         "Количество единиц в стоке (axioma.inventory.orderqty, numeric 15.2). ВНИМАНИЕ: в asset каждый объект = 1 единица.",
+    "installdate":      "Дата ввода в эксплуатацию (date). Используется как created_at т.к. прямого поля даты создания в axioma.asset нет.",
+    "changedate":       "Дата последнего изменения записи (timestamp NOT NULL) — axioma.asset.changedate.",
+    "siteid":           "Код площадки/объекта (varchar 8), обязательный ключ партицирования в Аксиоме.",
+    "orgid":            "Код организации (varchar 8).",
+    "responsible":      "Ответственное лицо (varchar 15) — логин или код сотрудника.",
+    "pluscassetdept":   "Подразделение/отдел (varchar 80) — кастомное поле.",
+    "pluscphyloc":      "Физическое местонахождение в свободном тексте (varchar 250).",
+    "assettype":        "Тип актива из справочника axioma.assettype (varchar 15).",
+    "status":           "Текущий статус актива (varchar 20): OPERATING, DECOMMISSIONED и т.д.",
+    "serialnum":        "Серийный номер (varchar 64).",
+    "assettag":         "Инвентарный тег/ярлык (varchar 64)."
+  },
+
+  "unanswered": [
+    "УТОЧНИТЬ: поле floor (этаж) не найдено в axioma.asset или axioma.locations напрямую. Присутствует только в axioma.dpauserinfo.floor (данные сотрудников). Уточнить у администратора Аксиомы.",
+    "УТОЧНИТЬ: поле quantity — в asset-модели Аксиомы каждый актив является отдельной записью (qty=1). Поле orderqty относится к axioma.inventory (склад). Уточнить логику учёта количества.",
+    "УТОЧНИТЬ: начальная дата записи (created_at) — в axioma.asset отсутствует явное поле даты создания. Используется installdate или commdate как приближение."
+  ],
+
+  "tables": {
+    "primary_items": "axioma.asset",
+    "item_catalog":  "axioma.item",
+    "locations":     "axioma.locations",
+    "categories":    "axioma.classstructure",
+    "inventory":     "axioma.inventory",
+    "transfers":     "axioma.assettrans"
+  },
+
+  "items": [
+    {
+      "assetnum":       "",
+      "x_inventarnum":  "",
+      "description":    "",
+      "classstructureid": "",
+      "reatroom":       "",
+      "axiroom":        "",
+      "reatbuilding":   "",
+      "location":       "",
+      "orderqty":       0,
+      "installdate":    "",
+      "changedate":     "",
+      "siteid":         "",
+      "orgid":          "",
+      "status":         "",
+      "assettype":      "",
+      "serialnum":      "",
+      "assettag":       "",
+      "responsible":    "",
+      "pluscassetdept": "",
+      "pluscphyloc":    ""
+    }
+  ],
+
+  "rooms": [
+    {
+      "location":    "",
+      "description": "",
+      "type":        "",
+      "reatroom":    "",
+      "reatbuilding":"",
+      "axiroom":     "",
+      "axibuilding": "",
+      "bimroomname": "",
+      "siteid":      "",
+      "orgid":       "",
+      "area":        0,
+      "typeloc":     "",
+      "reatterritory": ""
+    }
+  ],
+
+  "total_items": 0,
+  "total_rooms": 0,
+
+  "integration_query": "SELECT a.assetuid, a.assetnum, a.x_inventarnum, a.description, a.classstructureid, cs.description AS category_name, a.assettype, a.location AS location_code, l.description AS location_name, a.reatbuilding, a.reatroom, a.axibuilding, a.axiroom, a.pluscphyloc, a.pluscassetdept, a.responsible, a.status, a.statusdate, a.installdate, a.changedate, a.changeby, a.siteid, a.orgid FROM axioma.asset a LEFT JOIN axioma.locations l ON l.location = a.location AND l.siteid = a.siteid LEFT JOIN axioma.classstructure cs ON cs.classstructureid = a.classstructureid"
+}
