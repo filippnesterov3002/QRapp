@@ -15,7 +15,8 @@ const _kHeaderColor = Color(0xFFA80000);
 const _kAltRowColor = Color(0xFFF9F0F0);
 // Цвета для режима объединения
 const _kMergeHighlight = Color(0xFFE8F5E9);
-const _kMergeSelected  = Color(0xFFC8E6C9);
+const _kMergeSelected = Color(0xFFC8E6C9);
+const _kAllRoomsValue = '__all_rooms__';
 
 class InventoryScreen extends StatefulWidget {
   final List<Item> items;
@@ -37,8 +38,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // ── Состояние фильтра ─────────────────────────────────────────────────────
   /// Выбранные ключи категорий (пусто = все категории)
   Set<String> _selectedCategories = {};
-  /// Выбранные названия помещений (пусто = все помещения)
-  Set<String> _selectedRooms = {};
+
+  /// Выбранное помещение (null = все помещения)
+  String? _selectedRoom;
+
   /// Диапазон дат по createdAt (null = без ограничения)
   DateTime? _dateFrom;
   DateTime? _dateTo;
@@ -46,6 +49,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // ── Состояние сортировки ──────────────────────────────────────────────────
   /// Активный параметр сортировки (null = без сортировки)
   _SortField? _sortField;
+
   /// Направление сортировки: true = по возрастанию / А→Я
   bool _sortAscending = true;
 
@@ -54,12 +58,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   // ── Состояние режима мультивыбора ─────────────────────────────────────────
   bool _isSelectMode = false;
+
   /// Hive-ключи выбранных предметов
   final Set<dynamic> _selectedKeys = {};
+
   /// Группы объединяемых предметов: ключ = "наименование|комната"
   Map<String, List<Item>> _mergeableGroups = {};
+
   /// Hive-ключи всех предметов в объединяемых группах
   Set<dynamic> _mergeableKeys = {};
+
   /// Ключ группы, разрешённой для добавления в текущий выбор
   String? _currentGroupKey;
 
@@ -68,7 +76,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   /// Активен ли хоть один фильтр
   bool get _isFilterActive =>
       _selectedCategories.isNotEmpty ||
-      _selectedRooms.isNotEmpty ||
+      _selectedRoom != null ||
       _dateFrom != null ||
       _dateTo != null;
 
@@ -80,8 +88,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           !_selectedCategories.contains(item.category ?? '')) {
         return false;
       }
-      if (_selectedRooms.isNotEmpty &&
-          !_selectedRooms.contains(item.location.room)) {
+      if (_selectedRoom != null && item.location.room.trim() != _selectedRoom) {
         return false;
       }
       if (_dateFrom != null) {
@@ -91,8 +98,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
       if (_dateTo != null) {
         final created = item.createdAt;
         // Включаем весь последний день
-        final endOfDay = DateTime(
-            _dateTo!.year, _dateTo!.month, _dateTo!.day, 23, 59, 59);
+        final endOfDay =
+            DateTime(_dateTo!.year, _dateTo!.month, _dateTo!.day, 23, 59, 59);
         if (created == null || created.isAfter(endOfDay)) return false;
       }
       return true;
@@ -109,7 +116,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
           case _SortField.name:
             cmp = a.name.toLowerCase().compareTo(b.name.toLowerCase());
           case _SortField.room:
-            cmp = a.location.room.toLowerCase()
+            cmp = a.location.room
+                .toLowerCase()
                 .compareTo(b.location.room.toLowerCase());
           case _SortField.quantity:
             cmp = (a.quantity ?? 0).compareTo(b.quantity ?? 0);
@@ -147,7 +155,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   void _clearFilter() {
     setState(() {
       _selectedCategories = {};
-      _selectedRooms = {};
+      _selectedRoom = null;
       _dateFrom = null;
       _dateTo = null;
     });
@@ -155,8 +163,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  String _groupKey(Item item) =>
-      '${item.name.trim().toLowerCase()}|'
+  String _groupKey(Item item) => '${item.name.trim().toLowerCase()}|'
       '${item.location.room.trim().toLowerCase()}';
 
   String _nextItemId(Box<Item> box) =>
@@ -205,13 +212,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
       builder: (_) => _FilterSheet(
         allItems: widget.items,
         initialCategories: Set.from(_selectedCategories),
-        initialRooms: Set.from(_selectedRooms),
+        initialRoom: _selectedRoom,
         initialDateFrom: _dateFrom,
         initialDateTo: _dateTo,
-        onApply: (cats, rooms, dateFrom, dateTo) {
+        onApply: (cats, room, dateFrom, dateTo) {
           setState(() {
             _selectedCategories = cats;
-            _selectedRooms = rooms;
+            _selectedRoom = room;
             _dateFrom = dateFrom;
             _dateTo = dateTo;
           });
@@ -332,9 +339,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     if (_selectedKeys.length < 2) return;
 
     final box = Hive.box<Item>('items');
-    final selectedItems = widget.items
-        .where((item) => _selectedKeys.contains(item.key))
-        .toList();
+    final selectedItems =
+        widget.items.where((item) => _selectedKeys.contains(item.key)).toList();
     if (selectedItems.isEmpty) return;
 
     final confirmed = await showDialog<bool>(
@@ -361,6 +367,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       responsiblePerson: first.responsiblePerson,
       createdAt: first.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
+      qrCodeData: newItemId,
     );
 
     box.add(mergedItem);
@@ -467,8 +474,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 ? '${item.location.floor} / ${item.location.room}'
                                 : item.location.room;
                             final category = categoryByKey(item.category);
-                            final isSelected =
-                                _selectedKeys.contains(item.key);
+                            final isSelected = _selectedKeys.contains(item.key);
                             final isHighlighted =
                                 _mergeableKeys.contains(item.key);
                             final isLast = index == filteredItems.length - 1;
@@ -642,15 +648,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // ── Баннер активного фильтра ──────────────────────────────────────────────
 
   String _fmtDate(DateTime dt) =>
-      '${dt.day.toString().padLeft(2,'0')}.${dt.month.toString().padLeft(2,'0')}.${dt.year}';
+      '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}';
 
   Widget _buildActiveFilterBanner() {
     // Собираем метки: имена категорий, помещения и диапазон дат через •
     final parts = <String>[
       for (final key in _selectedCategories)
-        if (categoryByKey(key) case final cat?)
-          '${cat.emoji} ${cat.name}',
-      ..._selectedRooms,
+        if (categoryByKey(key) case final cat?) '${cat.emoji} ${cat.name}',
+      if (_selectedRoom != null) _selectedRoom!,
       if (_dateFrom != null && _dateTo != null)
         '${_fmtDate(_dateFrom!)} – ${_fmtDate(_dateTo!)}'
       else if (_dateFrom != null)
@@ -775,14 +780,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
           OutlinedButton(
             onPressed: _exitSelectMode,
             style: OutlinedButton.styleFrom(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30)),
               side: const BorderSide(color: Colors.grey),
             ),
-            child:
-                const Text('Отмена', style: TextStyle(color: Colors.grey)),
+            child: const Text('Отмена', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),
@@ -807,15 +810,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
             if (_isSelectMode)
               _headerCell('☑', flex: 1, center: true)
             else
-              _headerCell('№', flex: 1,
-                  center: true, sortField: _SortField.number),
+              _headerCell('№',
+                  flex: 1, center: true, sortField: _SortField.number),
             _vDivider(),
             _headerCell('Наим.', flex: 5, sortField: _SortField.name),
             _vDivider(),
             _headerCell('Положение', flex: 3, sortField: _SortField.room),
             _vDivider(),
-            _headerCell('Кол.', flex: 1,
-                center: true, sortField: _SortField.quantity),
+            _headerCell('Кол.',
+                flex: 1, center: true, sortField: _SortField.quantity),
           ],
         ),
       ),
@@ -876,8 +879,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       rowColor = index.isEven ? Colors.white : _kAltRowColor;
     }
 
-    final displayName =
-        categoryEmoji != null ? '$categoryEmoji  $name' : name;
+    final displayName = categoryEmoji != null ? '$categoryEmoji  $name' : name;
 
     return Container(
       decoration: BoxDecoration(
@@ -959,33 +961,33 @@ enum _SortField {
 extension _SortFieldX on _SortField {
   /// Отображаемое название
   String get label => switch (this) {
-        _SortField.number    => 'По номеру №',
-        _SortField.name      => 'По наименованию',
-        _SortField.room      => 'По помещению',
-        _SortField.quantity  => 'По количеству',
-        _SortField.category  => 'По категории',
+        _SortField.number => 'По номеру №',
+        _SortField.name => 'По наименованию',
+        _SortField.room => 'По помещению',
+        _SortField.quantity => 'По количеству',
+        _SortField.category => 'По категории',
         _SortField.createdAt => 'По дате создания',
         _SortField.updatedAt => 'По дате изменения',
       };
 
   /// Подпись для направления «по возрастанию»
   String get ascLabel => switch (this) {
-        _SortField.number    => '1 → 100',
-        _SortField.quantity  => '1 → 100',
-        _SortField.name      => 'А → Я',
-        _SortField.room      => 'А → Я',
-        _SortField.category  => 'А → Я',
+        _SortField.number => '1 → 100',
+        _SortField.quantity => '1 → 100',
+        _SortField.name => 'А → Я',
+        _SortField.room => 'А → Я',
+        _SortField.category => 'А → Я',
         _SortField.createdAt => 'Старые',
         _SortField.updatedAt => 'Старые',
       };
 
   /// Подпись для направления «по убыванию»
   String get descLabel => switch (this) {
-        _SortField.number    => '100 → 1',
-        _SortField.quantity  => '100 → 1',
-        _SortField.name      => 'Я → А',
-        _SortField.room      => 'Я → А',
-        _SortField.category  => 'Я → А',
+        _SortField.number => '100 → 1',
+        _SortField.quantity => '100 → 1',
+        _SortField.name => 'Я → А',
+        _SortField.room => 'Я → А',
+        _SortField.category => 'Я → А',
         _SortField.createdAt => 'Новые',
         _SortField.updatedAt => 'Новые',
       };
@@ -1055,8 +1057,7 @@ class _HintCard extends StatelessWidget {
                 ),
               ),
               if (onTap != null)
-                const Icon(Icons.chevron_right,
-                    color: Colors.grey, size: 18),
+                const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
             ],
           ),
         ),
@@ -1125,8 +1126,7 @@ class _SortSheetState extends State<_SortSheet> {
               children: [
                 const Text(
                   'Сортировка',
-                  style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
@@ -1226,8 +1226,7 @@ class _SortOption extends StatelessWidget {
               field.label,
               style: TextStyle(
                 fontSize: 15,
-                fontWeight:
-                    isSelected ? FontWeight.w700 : FontWeight.normal,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
                 color: isSelected ? _kBorderColor : Colors.black87,
               ),
             ),
@@ -1274,8 +1273,7 @@ class _DirectionButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: selected ? _kBorderColor : Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -1297,8 +1295,7 @@ class _DirectionButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 color: selected ? Colors.white : Colors.black87,
-                fontWeight:
-                    selected ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ],
@@ -1313,17 +1310,17 @@ class _DirectionButton extends StatelessWidget {
 class _FilterSheet extends StatefulWidget {
   final List<Item> allItems;
   final Set<String> initialCategories;
-  final Set<String> initialRooms;
+  final String? initialRoom;
   final DateTime? initialDateFrom;
   final DateTime? initialDateTo;
   final void Function(
-      Set<String> cats, Set<String> rooms,
-      DateTime? dateFrom, DateTime? dateTo) onApply;
+          Set<String> cats, String? room, DateTime? dateFrom, DateTime? dateTo)
+      onApply;
 
   const _FilterSheet({
     required this.allItems,
     required this.initialCategories,
-    required this.initialRooms,
+    required this.initialRoom,
     required this.onApply,
     this.initialDateFrom,
     this.initialDateTo,
@@ -1335,7 +1332,7 @@ class _FilterSheet extends StatefulWidget {
 
 class _FilterSheetState extends State<_FilterSheet> {
   late Set<String> _cats;
-  late Set<String> _rooms;
+  late String _roomValue;
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
@@ -1346,23 +1343,28 @@ class _FilterSheetState extends State<_FilterSheet> {
   void initState() {
     super.initState();
     _cats = Set.from(widget.initialCategories);
-    _rooms = Set.from(widget.initialRooms);
     _dateFrom = widget.initialDateFrom;
     _dateTo = widget.initialDateTo;
     _allRooms = widget.allItems
-        .map((e) => e.location.room)
+        .map((e) => e.location.room.trim())
+        .where((room) => room.isNotEmpty)
         .toSet()
         .toList()
       ..sort();
+    _roomValue =
+        widget.initialRoom != null && _allRooms.contains(widget.initialRoom)
+            ? widget.initialRoom!
+            : _kAllRoomsValue;
   }
 
   // ── Динамические счётчики ─────────────────────────────────────────────────
 
-  /// Количество предметов в категории с учётом выбранных помещений
+  /// Количество предметов в категории с учётом выбранного помещения
   int _countForCategory(String catKey) {
     return widget.allItems.where((item) {
       if (item.category != catKey) return false;
-      if (_rooms.isNotEmpty && !_rooms.contains(item.location.room)) {
+      if (_selectedRoomDraft != null &&
+          item.location.room.trim() != _selectedRoomDraft) {
         return false;
       }
       return true;
@@ -1372,7 +1374,7 @@ class _FilterSheetState extends State<_FilterSheet> {
   /// Количество предметов в помещении с учётом выбранных категорий
   int _countForRoom(String room) {
     return widget.allItems.where((item) {
-      if (item.location.room != room) return false;
+      if (item.location.room.trim() != room) return false;
       if (_cats.isNotEmpty && !_cats.contains(item.category ?? '')) {
         return false;
       }
@@ -1380,13 +1382,17 @@ class _FilterSheetState extends State<_FilterSheet> {
     }).length;
   }
 
-  /// Общее количество предметов с учётом выбранных помещений (для чипа "Все")
+  /// Общее количество предметов с учётом выбранного помещения (для чипа "Все")
   int get _totalCount {
-    if (_rooms.isEmpty) return widget.allItems.length;
+    final room = _selectedRoomDraft;
+    if (room == null) return widget.allItems.length;
     return widget.allItems
-        .where((item) => _rooms.contains(item.location.room))
+        .where((item) => item.location.room.trim() == room)
         .length;
   }
+
+  String? get _selectedRoomDraft =>
+      _roomValue == _kAllRoomsValue ? null : _roomValue;
 
   // ── Логика выбора категорий ───────────────────────────────────────────────
 
@@ -1404,27 +1410,17 @@ class _FilterSheetState extends State<_FilterSheet> {
     });
   }
 
-  void _toggleRoom(String room) {
-    setState(() {
-      if (_rooms.contains(room)) {
-        _rooms.remove(room);
-      } else {
-        _rooms.add(room);
-      }
-    });
-  }
-
   void _reset() {
     setState(() {
       _cats.clear();
-      _rooms.clear();
+      _roomValue = _kAllRoomsValue;
       _dateFrom = null;
       _dateTo = null;
     });
   }
 
   void _apply() {
-    widget.onApply(Set.from(_cats), Set.from(_rooms), _dateFrom, _dateTo);
+    widget.onApply(Set.from(_cats), _selectedRoomDraft, _dateFrom, _dateTo);
     Navigator.pop(context);
   }
 
@@ -1433,172 +1429,206 @@ class _FilterSheetState extends State<_FilterSheet> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 16,
-          // Учитываем высоту клавиатуры
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Заголовок ─────────────────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Фильтр',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // ── Секция «По категории» ─────────────────────────────────────
-            const Text(
-              'По категории',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                // Чип «Все»
-                _FilterChip(
-                  label: 'Все ($_totalCount)',
-                  selected: _cats.isEmpty,
-                  onTap: _toggleAllCategories,
-                ),
-                // Чипы категорий
-                for (final cat in kCategories)
-                  _FilterChip(
-                    label: '${cat.emoji} ${cat.name} (${_countForCategory(cat.key)})',
-                    selected: _cats.contains(cat.key),
-                    onTap: () => _toggleCategory(cat.key),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.82,
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            // Учитываем высоту клавиатуры
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Заголовок ─────────────────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Фильтр',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 16),
-
-            // ── Секция «По помещению» ─────────────────────────────────────
-            const Text(
-              'По помещению',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            _allRooms.isEmpty
-                ? const Text(
-                    'Нет данных',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
-                  )
-                : Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+              const SizedBox(height: 16),
+
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final room in _allRooms)
-                        _FilterChip(
-                          label: '$room (${_countForRoom(room)})',
-                          selected: _rooms.contains(room),
-                          onTap: () => _toggleRoom(room),
+                      // ── Секция «По категории» ─────────────────────────────
+                      const Text(
+                        'По категории',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          // Чип «Все»
+                          _FilterChip(
+                            label: 'Все ($_totalCount)',
+                            selected: _cats.isEmpty,
+                            onTap: _toggleAllCategories,
+                          ),
+                          // Чипы категорий
+                          for (final cat in kCategories)
+                            _FilterChip(
+                              label:
+                                  '${cat.emoji} ${cat.name} (${_countForCategory(cat.key)})',
+                              selected: _cats.contains(cat.key),
+                              onTap: () => _toggleCategory(cat.key),
+                            ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+                      const Divider(height: 1),
+                      const SizedBox(height: 16),
+
+                      // ── Секция «Помещение» ────────────────────────────────
+                      const Text(
+                        'Помещение',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        key: ValueKey(_roomValue),
+                        initialValue: _roomValue,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: _kBorderColor, width: 1.5),
+                          ),
+                        ),
+                        items: [
+                          DropdownMenuItem(
+                            value: _kAllRoomsValue,
+                            child: Text(
+                                'Все помещения (${widget.allItems.length})'),
+                          ),
+                          for (final room in _allRooms)
+                            DropdownMenuItem(
+                              value: room,
+                              child: Text('$room (${_countForRoom(room)})'),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => _roomValue = value);
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+                      const Divider(height: 1),
+                      const SizedBox(height: 16),
+
+                      // ── Секция «По дате создания» ─────────────────────────
+                      const Text(
+                        'По дате создания',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DatePickerField(
+                              label: 'С',
+                              value: _dateFrom,
+                              lastDate: _dateTo,
+                              onPicked: (d) => setState(() => _dateFrom = d),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _DatePickerField(
+                              label: 'По',
+                              value: _dateTo,
+                              firstDate: _dateFrom,
+                              onPicked: (d) => setState(() => _dateTo = d),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
                     ],
                   ),
-
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 16),
-
-            // ── Секция «По дате создания» ─────────────────────────────────
-            const Text(
-              'По дате создания',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _DatePickerField(
-                    label: 'С',
-                    value: _dateFrom,
-                    lastDate: _dateTo,
-                    onPicked: (d) => setState(() => _dateFrom = d),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _DatePickerField(
-                    label: 'По',
-                    value: _dateTo,
-                    firstDate: _dateFrom,
-                    onPicked: (d) => setState(() => _dateTo = d),
-                  ),
-                ),
-              ],
-            ),
 
-            const SizedBox(height: 20),
-
-            // ── Кнопки «Сбросить» / «Применить» ──────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _reset,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30)),
-                      side: const BorderSide(color: _kBorderColor),
-                    ),
-                    child: const Text(
-                      'Сбросить',
-                      style: TextStyle(color: _kBorderColor),
+              // ── Кнопки «Сбросить» / «Применить» ──────────────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _reset,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30)),
+                        side: const BorderSide(color: _kBorderColor),
+                      ),
+                      child: const Text(
+                        'Сбросить',
+                        style: TextStyle(color: _kBorderColor),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _apply,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _kBorderColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30)),
-                      elevation: 0,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _apply,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _kBorderColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30)),
+                        elevation: 0,
+                      ),
+                      child: const Text('Применить'),
                     ),
-                    child: const Text('Применить'),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1645,8 +1675,7 @@ class _FilterChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 color: selected ? Colors.white : Colors.black87,
-                fontWeight:
-                    selected ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ],
@@ -1692,7 +1721,9 @@ class _DatePickerField extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(
-          color: value != null ? _kBorderColor.withValues(alpha: 0.08) : Colors.white,
+          color: value != null
+              ? _kBorderColor.withValues(alpha: 0.08)
+              : Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: value != null ? _kBorderColor : Colors.grey.shade300,
@@ -1701,8 +1732,7 @@ class _DatePickerField extends StatelessWidget {
         child: Row(
           children: [
             Icon(Icons.calendar_today_outlined,
-                size: 15,
-                color: value != null ? _kBorderColor : Colors.grey),
+                size: 15, color: value != null ? _kBorderColor : Colors.grey),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -1710,7 +1740,8 @@ class _DatePickerField extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   color: value != null ? _kBorderColor : Colors.grey,
-                  fontWeight: value != null ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight:
+                      value != null ? FontWeight.w600 : FontWeight.normal,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1757,8 +1788,7 @@ class _MergeConfirmDialog extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             '${items.map((e) => '${e.quantity ?? 0} шт.').join(' + ')} = $totalQty шт.',
-            style:
-                const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 10),
           Container(
@@ -1771,8 +1801,7 @@ class _MergeConfirmDialog extends StatelessWidget {
             ),
             child: const Text(
               '⚠️ Старые QR-коды станут недействительными',
-              style:
-                  TextStyle(fontSize: 12, color: Color(0xFFE65100)),
+              style: TextStyle(fontSize: 12, color: Color(0xFFE65100)),
               textAlign: TextAlign.center,
             ),
           ),
@@ -1812,8 +1841,8 @@ class _InfoRow extends StatelessWidget {
               style: const TextStyle(fontSize: 13, color: Colors.grey)),
           Expanded(
             child: Text(value,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w500)),
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
           ),
         ],
       ),

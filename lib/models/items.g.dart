@@ -25,17 +25,18 @@ class ItemAdapter extends TypeAdapter<Item> {
       imagePath: fields[5] as String?,
       inventoryNumber: fields[6] as String?,
       responsiblePerson: fields[7] as String?,
-      itemId: fields[8] as String?,    // Артикул ITEM-XXX
-      category: fields[9] as String?,  // Ключ категории
+      itemId: fields[8] as String?, // Артикул ITEM-XXX
+      category: fields[9] as String?, // Ключ категории
       createdAt: fields[10] as DateTime?,
       updatedAt: fields[11] as DateTime?,
+      qrCodeData: fields[12] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Item obj) {
     writer
-      ..writeByte(12) // Количество полей: 12
+      ..writeByte(13) // Количество полей: 13
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +60,9 @@ class ItemAdapter extends TypeAdapter<Item> {
       ..writeByte(10)
       ..write(obj.createdAt)
       ..writeByte(11)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(12)
+      ..write(obj.qrCodeData);
   }
 
   @override

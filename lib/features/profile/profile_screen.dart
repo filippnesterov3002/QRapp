@@ -271,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: const TextStyle(fontSize: 16)),
                     trailing: Switch(
                       value: isDark,
-                      activeColor: kRed,
+                      activeThumbColor: kRed,
                       onChanged: (v) async {
                         await Hive.box('settings').put('isDarkMode', v);
                       },

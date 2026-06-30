@@ -13,6 +13,7 @@ const _kRed = Color(0xFFA80000);
 
 class QrCodeScreen extends StatefulWidget {
   final Item item;
+
   /// Если задано — показывает предупреждение об устаревших QR-кодах
   final String? mergeWarning;
 
@@ -31,8 +32,8 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   Future<void> _saveToGallery() async {
     setState(() => _saving = true);
     try {
-      final RenderRepaintBoundary boundary = _qrKey.currentContext!
-          .findRenderObject()! as RenderRepaintBoundary;
+      final RenderRepaintBoundary boundary =
+          _qrKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
       final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       final ByteData? byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
@@ -69,8 +70,9 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
-    // Данные QR-кода — артикул или название, если артикул не задан
-    final qrData = item.itemId?.isNotEmpty == true ? item.itemId! : item.name;
+    final qrData = item.qrCodeData?.trim().isNotEmpty == true
+        ? item.qrCodeData!.trim()
+        : item.itemId?.trim();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -98,97 +100,122 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Предупреждение об устаревших QR-кодах (показывается после объединения)
-            if (widget.mergeWarning != null)
+            if (qrData == null || qrData.isEmpty)
               Container(
                 width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
-                  border: Border.all(color: const Color(0xFFFF9800), width: 1.5),
+                  color: Colors.white,
+                  border: Border.all(color: _kRed, width: 1.5),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(
-                  widget.mergeWarning!,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFFE65100),
+                child: const Text(
+                  'QR-код нельзя отобразить: у предмета нет артикула',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.black87,
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
                 ),
-              ),
-            // QR-код обёрнут в RepaintBoundary для сохранения в галерею
-            RepaintBoundary(
-              key: _qrKey,
-              child: Container(
-                color: Colors.white,
-                padding: const EdgeInsets.all(20),
-                child: QrImageView(
-                  data: qrData,
-                  version: QrVersions.auto,
-                  size: 220,
-                  backgroundColor: Colors.white,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Информационные строки с красной рамкой
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: _kRed, width: 1.5),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Column(
-                children: [
-                  _InfoRow(label: 'Наименование', value: item.name),
-                  Container(height: 1, color: _kRed.withValues(alpha: 0.3)),
-                  _InfoRow(
-                    label: 'Артикул',
-                    value: item.itemId?.isNotEmpty == true ? item.itemId! : '—',
+              )
+            else ...[
+              // Предупреждение об устаревших QR-кодах (показывается после объединения)
+              if (widget.mergeWarning != null)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    border:
+                        Border.all(color: const Color(0xFFFF9800), width: 1.5),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  Container(height: 1, color: _kRed.withValues(alpha: 0.3)),
-                  _InfoRow(label: 'Положение', value: _buildLocation()),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Кнопка сохранения в галерею
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _saving ? null : _saveToGallery,
-                icon: _saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.download, size: 20),
-                label: Text(
-                  _saving ? 'Сохранение...' : 'Сохранить в галерею',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kRed,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                  child: Text(
+                    widget.mergeWarning!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFFE65100),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  elevation: 0,
+                ),
+              // QR-код обёрнут в RepaintBoundary для сохранения в галерею
+              RepaintBoundary(
+                key: _qrKey,
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(20),
+                  child: QrImageView(
+                    data: qrData,
+                    version: QrVersions.auto,
+                    size: 220,
+                    backgroundColor: Colors.white,
+                  ),
                 ),
               ),
-            ),
+
+              const SizedBox(height: 24),
+
+              // Информационные строки с красной рамкой
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: _kRed, width: 1.5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Column(
+                  children: [
+                    _InfoRow(label: 'Наименование', value: item.name),
+                    Container(height: 1, color: _kRed.withValues(alpha: 0.3)),
+                    _InfoRow(
+                      label: 'Артикул',
+                      value:
+                          item.itemId?.isNotEmpty == true ? item.itemId! : '—',
+                    ),
+                    Container(height: 1, color: _kRed.withValues(alpha: 0.3)),
+                    _InfoRow(label: 'Положение', value: _buildLocation()),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Кнопка сохранения в галерею
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _saving ? null : _saveToGallery,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.download, size: 20),
+                  label: Text(
+                    _saving ? 'Сохранение...' : 'Сохранить в галерею',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kRed,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -210,8 +237,7 @@ class _InfoRow extends StatelessWidget {
         children: [
           Container(
             width: 120,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Text(
               label,
               style: const TextStyle(fontSize: 14, color: Colors.grey),
@@ -220,8 +246,7 @@ class _InfoRow extends StatelessWidget {
           Container(width: 1.5, color: _kRed),
           Expanded(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Text(
                 value,
                 style: const TextStyle(

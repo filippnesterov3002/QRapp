@@ -35,6 +35,7 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
   final _nameController = TextEditingController();
   final _locationController = TextEditingController();
   final _quantityController = TextEditingController();
+
   /// Путь к выбранному фото (null = не выбрано)
   String? _imagePath;
 
@@ -71,9 +72,18 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
     final location = _locationController.text.trim();
     final quantityText = _quantityController.text.trim();
 
-    if (name.isEmpty) { _showError('Введите наименование'); return; }
-    if (location.isEmpty) { _showError('Введите положение'); return; }
-    if (quantityText.isEmpty) { _showError('Введите количество'); return; }
+    if (name.isEmpty) {
+      _showError('Введите наименование');
+      return;
+    }
+    if (location.isEmpty) {
+      _showError('Введите положение');
+      return;
+    }
+    if (quantityText.isEmpty) {
+      _showError('Введите количество');
+      return;
+    }
 
     final quantity = int.tryParse(quantityText);
     if (quantity == null || quantity <= 0) {
@@ -85,15 +95,16 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
 
     // ── Способ 1: проверка на дубликат (только для типа "по виду") ─────────
     if (!widget.category.perUnit) {
-      final existing = box.values.cast<Item>().where((item) =>
-          item.name.trim().toLowerCase() == name.toLowerCase() &&
-          item.location.room.trim().toLowerCase() == location.toLowerCase()
-      ).firstOrNull;
+      final existing = box.values
+          .cast<Item>()
+          .where((item) =>
+              item.name.trim().toLowerCase() == name.toLowerCase() &&
+              item.location.room.trim().toLowerCase() == location.toLowerCase())
+          .firstOrNull;
 
       if (existing != null) {
         // Найден дубликат — предлагаем объединить или создать отдельно
-        final choice =
-            await _showDuplicateDialog(existing, quantity);
+        final choice = await _showDuplicateDialog(existing, quantity);
         if (!mounted) return;
         if (choice == null) return; // Пользователь нажал «Назад»
 
@@ -208,13 +219,13 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
       // При merge сохраняем дату создания оригинала; при новом — DateTime.now()
       createdAt: existing?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
+      qrCodeData: itemId,
     );
   }
 
   /// Диалог при обнаружении дубликата.
   /// Возвращает выбор пользователя или null при отмене.
-  Future<_MergeChoice?> _showDuplicateDialog(
-      Item existing, int newQty) async {
+  Future<_MergeChoice?> _showDuplicateDialog(Item existing, int newQty) async {
     return showDialog<_MergeChoice>(
       context: context,
       barrierDismissible: true,
@@ -237,8 +248,8 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
               const SizedBox(height: 4),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(8),
@@ -263,8 +274,7 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
             ),
             // Создать отдельно — новая запись с новым артикулом
             OutlinedButton(
-              onPressed: () =>
-                  Navigator.pop(ctx, _MergeChoice.separate),
+              onPressed: () => Navigator.pop(ctx, _MergeChoice.separate),
               child: const Text('Создать отдельно'),
             ),
             // Объединить — сложить количества
@@ -273,8 +283,7 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
                 backgroundColor: _kRed,
                 foregroundColor: Colors.white,
               ),
-              onPressed: () =>
-                  Navigator.pop(ctx, _MergeChoice.merge),
+              onPressed: () => Navigator.pop(ctx, _MergeChoice.merge),
               child: const Text('Объединить'),
             ),
           ],
@@ -342,22 +351,32 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
                       shape: BoxShape.circle,
                     ),
                     alignment: Alignment.center,
-                    child: Text(cat.emoji,
-                        style: const TextStyle(fontSize: 26)),
+                    child:
+                        Text(cat.emoji, style: const TextStyle(fontSize: 26)),
                   ),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(cat.name,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          cat.name,
                           style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 2),
-                      // Тип учёта — только для чтения
-                      Text('Учёт ${cat.accountingType}',
-                          style: const TextStyle(
-                              fontSize: 13, color: Colors.grey)),
-                    ],
+                              fontSize: 16, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        // Тип учёта — только для чтения
+                        Text(
+                          'Учёт ${cat.accountingType}',
+                          style:
+                              const TextStyle(fontSize: 13, color: Colors.grey),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -398,9 +417,7 @@ class _CreateItemScreenState extends State<CreateItemScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _imagePath != null
-                        ? _kRed
-                        : const Color(0xFFE0E0E0),
+                    color: _imagePath != null ? _kRed : const Color(0xFFE0E0E0),
                     width: 1.5,
                   ),
                 ),
@@ -504,8 +521,8 @@ class _DialogInfoRow extends StatelessWidget {
               style: const TextStyle(fontSize: 13, color: Colors.grey)),
           Expanded(
             child: Text(value,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w500)),
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
           ),
         ],
       ),

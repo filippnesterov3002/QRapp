@@ -30,8 +30,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController =
-        TextEditingController(text: widget.item.name);
+    _nameController = TextEditingController(text: widget.item.name);
     _locationController =
         TextEditingController(text: widget.item.location.room);
     _quantityController =
@@ -65,9 +64,18 @@ class _EditItemScreenState extends State<EditItemScreen> {
     final location = _locationController.text.trim();
     final quantityText = _quantityController.text.trim();
 
-    if (name.isEmpty) { _showError('Введите наименование'); return; }
-    if (location.isEmpty) { _showError('Введите положение'); return; }
-    if (quantityText.isEmpty) { _showError('Введите количество'); return; }
+    if (name.isEmpty) {
+      _showError('Введите наименование');
+      return;
+    }
+    if (location.isEmpty) {
+      _showError('Введите положение');
+      return;
+    }
+    if (quantityText.isEmpty) {
+      _showError('Введите количество');
+      return;
+    }
 
     final quantity = int.tryParse(quantityText);
     if (quantity == null || quantity <= 0) {
@@ -96,6 +104,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
       category: widget.item.category,
       createdAt: widget.item.createdAt,
       updatedAt: DateTime.now(),
+      qrCodeData: widget.item.qrCodeData,
     );
 
     await box.delete(widget.item.key);
@@ -169,8 +178,8 @@ class _EditItemScreenState extends State<EditItemScreen> {
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
-                      child: Text(cat.emoji,
-                          style: const TextStyle(fontSize: 26)),
+                      child:
+                          Text(cat.emoji, style: const TextStyle(fontSize: 26)),
                     ),
                     const SizedBox(width: 14),
                     Column(
@@ -222,9 +231,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _imagePath != null
-                        ? _kRed
-                        : const Color(0xFFE0E0E0),
+                    color: _imagePath != null ? _kRed : const Color(0xFFE0E0E0),
                     width: 1.5,
                   ),
                 ),

@@ -10,6 +10,7 @@ import '../../services/changelog_service.dart';
 import '../../services/photo_service.dart';
 import 'edit_item_screen.dart';
 import 'item_history_screen.dart';
+import 'qr_code_screen.dart';
 
 const _kRed = Color(0xFFA80000);
 
@@ -36,6 +37,63 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
     return DateFormat('d MMMM yyyy, HH:mm', 'ru').format(dt);
   }
 
+  Future<void> _saveUpdatedItem(Item updatedItem,
+      {String source = 'manual'}) async {
+    final box = Hive.box<Item>('items');
+    final key = _item.key;
+    if (key != null) {
+      await box.put(key, updatedItem);
+    } else {
+      await box.add(updatedItem);
+    }
+    await ChangeLogService.logUpdated(_item, updatedItem, source: source);
+
+    if (mounted) {
+      setState(() => _item = updatedItem);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _openQrCode({Item? item}) async {
+    final targetItem = item ?? _item;
+    final qrData = targetItem.qrCodeData?.trim().isNotEmpty == true
+        ? targetItem.qrCodeData!.trim()
+        : targetItem.itemId?.trim();
+    if (qrData == null || qrData.isEmpty) {
+      _showError('Нельзя создать QR-код: у предмета нет артикула');
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => QrCodeScreen(item: targetItem)),
+    );
+  }
+
+  Future<void> _createQrCode() async {
+    final itemId = _item.itemId?.trim();
+    if (itemId == null || itemId.isEmpty) {
+      _showError('Нельзя создать QR-код: у предмета нет артикула');
+      return;
+    }
+
+    final updatedItem = _item.copyWith(
+      qrCodeData: itemId,
+      updatedAt: DateTime.now(),
+    );
+    await _saveUpdatedItem(updatedItem, source: 'qr');
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('QR-код создан')),
+    );
+    await _openQrCode(item: updatedItem);
+  }
+
   /// Открывает шторку выбора фото и обновляет запись в Hive
   Future<void> _editPhoto() async {
     final itemId = _item.itemId ?? 'item_${_item.id}';
@@ -50,30 +108,12 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
 
     final newPath = result.isEmpty ? null : result;
 
-    final box = Hive.box<Item>('items');
-    final updatedItem = Item(
-      id: _item.id,
-      name: _item.name,
-      description: _item.description,
-      location: _item.location,
-      quantity: _item.quantity,
+    final updatedItem = _item.copyWith(
       imagePath: newPath,
-      inventoryNumber: _item.inventoryNumber,
-      responsiblePerson: _item.responsiblePerson,
-      itemId: _item.itemId,
-      category: _item.category,
-      createdAt: _item.createdAt,
+      clearImagePath: newPath == null,
       updatedAt: DateTime.now(),
     );
-
-    final key = _item.key;
-    await box.delete(key);
-    await box.add(updatedItem);
-    await ChangeLogService.logUpdated(_item, updatedItem);
-
-    if (mounted) {
-      setState(() => _item = updatedItem);
-    }
+    await _saveUpdatedItem(updatedItem);
   }
 
   /// Показывает диалог подтверждения удаления
@@ -86,7 +126,8 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
           text: TextSpan(
             style: const TextStyle(fontSize: 14, color: Colors.black87),
             children: [
-              TextSpan(text: _item.name,
+              TextSpan(
+                  text: _item.name,
                   style: const TextStyle(fontWeight: FontWeight.w600)),
               if (_item.itemId?.isNotEmpty == true) ...[
                 const TextSpan(text: '\n'),
@@ -150,6 +191,7 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
         : _item.location.room;
     final hasImage = _item.imagePath != null && _item.imagePath!.isNotEmpty;
     final cat = categoryByKey(_item.category);
+    final hasQrCode = _item.hasQrCode;
     final articleText = _item.itemId?.isNotEmpty == true
         ? _item.itemId!
         : (_item.inventoryNumber?.isNotEmpty == true
@@ -258,8 +300,8 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: _kRed.withValues(alpha: 0.4), width: 1.5),
+                border:
+                    Border.all(color: _kRed.withValues(alpha: 0.4), width: 1.5),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,8 +331,7 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Количество',
-                            style: TextStyle(
-                                fontSize: 14, color: Colors.grey)),
+                            style: TextStyle(fontSize: 14, color: Colors.grey)),
                         Text(
                           '${_item.quantity ?? 0} шт.',
                           style: const TextStyle(
@@ -312,12 +353,11 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
                       ),
                     ),
                     child: const Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       child: Row(
                         children: [
-                          Icon(Icons.history,
-                              size: 16, color: _kRed),
+                          Icon(Icons.history, size: 16, color: _kRed),
                           SizedBox(width: 8),
                           Text('История изменений',
                               style: TextStyle(
@@ -325,8 +365,7 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
                                   color: _kRed,
                                   fontWeight: FontWeight.w500)),
                           Spacer(),
-                          Icon(Icons.chevron_right,
-                              size: 16, color: _kRed),
+                          Icon(Icons.chevron_right, size: 16, color: _kRed),
                         ],
                       ),
                     ),
@@ -345,8 +384,8 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
                         const SizedBox(width: 6),
                         Text(
                           'Создан: ${_formatDate(createdAt)}',
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.grey),
+                          style:
+                              const TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
                     ),
@@ -373,6 +412,40 @@ class _ItemCardScreenState extends State<ItemCardScreen> {
                     const SizedBox(height: 10),
                 ],
               ),
+            ),
+
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              child: hasQrCode
+                  ? OutlinedButton.icon(
+                      onPressed: () => _openQrCode(),
+                      icon: const Icon(Icons.qr_code_2, size: 20),
+                      label: const Text('Показать QR-код'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kRed,
+                        side: const BorderSide(color: _kRed, width: 1.5),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                    )
+                  : ElevatedButton.icon(
+                      onPressed: _createQrCode,
+                      icon: const Icon(Icons.qr_code_2, size: 20),
+                      label: const Text('Создать QR-код'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _kRed,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
             ),
           ],
         ),

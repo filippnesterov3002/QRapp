@@ -8,8 +8,7 @@ class ChangeLogService {
 
   static Box<ChangeLog> get _box => Hive.box<ChangeLog>('changelog_box');
 
-  static String get _userId =>
-      AuthService.instance.currentUser?.userId ?? '';
+  static String get _userId => AuthService.instance.currentUser?.userId ?? '';
 
   static String get _userName {
     final u = AuthService.instance.currentUser;
@@ -17,8 +16,7 @@ class ChangeLogService {
     return u.name.isNotEmpty ? u.name : u.login;
   }
 
-  static String _genId() =>
-      'log_${DateTime.now().microsecondsSinceEpoch}';
+  static String _genId() => 'log_${DateTime.now().microsecondsSinceEpoch}';
 
   static String _id(Item item) => item.itemId ?? 'item_${item.id}';
 
@@ -131,20 +129,18 @@ class ChangeLogService {
     await _trim(id);
   }
 
-  static List<ChangeLog> getItemHistory(String itemId) => _box.values
-      .where((log) => log.itemId == itemId)
-      .toList()
-    ..sort((a, b) => b.changedAt.compareTo(a.changedAt));
+  static List<ChangeLog> getItemHistory(String itemId) =>
+      _box.values.where((log) => log.itemId == itemId).toList()
+        ..sort((a, b) => b.changedAt.compareTo(a.changedAt));
 
-  static List<ChangeLog> getAllHistory() => _box.values.toList()
-    ..sort((a, b) => b.changedAt.compareTo(a.changedAt));
+  static List<ChangeLog> getAllHistory() =>
+      _box.values.toList()..sort((a, b) => b.changedAt.compareTo(a.changedAt));
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
   static List<_Diff> _diff(Item a, Item b) {
     return [
-      if (a.name != b.name)
-        _Diff('Наименование', a.name, b.name),
+      if (a.name != b.name) _Diff('Наименование', a.name, b.name),
       if (a.location.room != b.location.room)
         _Diff('Помещение', a.location.room, b.location.room),
       if ((a.quantity ?? 0) != (b.quantity ?? 0))
@@ -152,7 +148,8 @@ class ChangeLogService {
       if (a.description != b.description)
         _Diff('Описание', a.description, b.description),
       if ((a.responsiblePerson ?? '') != (b.responsiblePerson ?? ''))
-        _Diff('Ответственный', a.responsiblePerson ?? '—', b.responsiblePerson ?? '—'),
+        _Diff('Ответственный', a.responsiblePerson ?? '—',
+            b.responsiblePerson ?? '—'),
       if ((a.inventoryNumber ?? '') != (b.inventoryNumber ?? ''))
         _Diff('Инв. номер', a.inventoryNumber ?? '—', b.inventoryNumber ?? '—'),
       if ((a.imagePath ?? '') != (b.imagePath ?? ''))
@@ -161,13 +158,17 @@ class ChangeLogService {
           (a.imagePath?.isNotEmpty == true) ? 'есть' : 'нет',
           (b.imagePath?.isNotEmpty == true) ? 'есть' : 'нет',
         ),
+      if ((a.qrCodeData ?? '') != (b.qrCodeData ?? ''))
+        _Diff(
+          'QR-код',
+          (a.qrCodeData?.isNotEmpty == true) ? 'создан' : 'нет',
+          (b.qrCodeData?.isNotEmpty == true) ? 'создан' : 'нет',
+        ),
     ];
   }
 
   static Future<void> _trim(String itemId) async {
-    final logs = _box.values
-        .where((l) => l.itemId == itemId)
-        .toList()
+    final logs = _box.values.where((l) => l.itemId == itemId).toList()
       ..sort((a, b) => b.changedAt.compareTo(a.changedAt));
     if (logs.length > _maxLogsPerItem) {
       for (final log in logs.sublist(_maxLogsPerItem)) {

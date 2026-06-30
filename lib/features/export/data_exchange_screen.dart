@@ -265,9 +265,7 @@ class DataExchangeScreen extends StatelessWidget {
     }
 
     final usedItemIds = existingById.keys.toSet();
-    int nextInt = box.isEmpty
-        ? 1
-        : box.values.map((i) => i.id).reduce(max) + 1;
+    int nextInt = box.isEmpty ? 1 : box.values.map((i) => i.id).reduce(max) + 1;
 
     int added = 0;
     int updated = 0;
@@ -411,7 +409,8 @@ class DataExchangeScreen extends StatelessWidget {
           'category': cell(row, 'classstructureid'),
           'location': room,
           'quantity': int.tryParse(cell(row, 'orderqty')) ??
-              int.tryParse(cell(row, 'quantity')) ?? 0,
+              int.tryParse(cell(row, 'quantity')) ??
+              0,
           'created_at': _toIso(cell(row, 'installdate').isNotEmpty
               ? cell(row, 'installdate')
               : cell(row, 'commdate')),
@@ -481,6 +480,7 @@ class DataExchangeScreen extends StatelessWidget {
       'installdate': item.createdAt?.toIso8601String() ?? '',
       'changedate': item.updatedAt?.toIso8601String() ?? '',
       '_category_name': cat?.name ?? '',
+      'qr_code_data': item.qrCodeData ?? '',
     };
   }
 
@@ -492,21 +492,23 @@ class DataExchangeScreen extends StatelessWidget {
   Map<String, dynamic> _normalizeItem(Map<String, dynamic> raw) {
     if (!_isAxiomaItem(raw)) return raw;
     final room = (raw['reatroom']?.toString().trim().isNotEmpty == true
-            ? raw['reatroom']
-            : raw['axiroom']?.toString().trim().isNotEmpty == true
-                ? raw['axiroom']
-                : raw['location'])
-        ?.toString()
-        .trim() ?? '';
+                ? raw['reatroom']
+                : raw['axiroom']?.toString().trim().isNotEmpty == true
+                    ? raw['axiroom']
+                    : raw['location'])
+            ?.toString()
+            .trim() ??
+        '';
     return {
       'item_id': raw['assetnum']?.toString().trim() ??
-          raw['x_inventarnum']?.toString().trim() ?? '',
+          raw['x_inventarnum']?.toString().trim() ??
+          '',
       'name': raw['description']?.toString().trim() ?? '',
       'category': raw['classstructureid']?.toString().trim() ?? '',
       'location': room,
       'quantity': raw['orderqty'] ?? raw['quantity'] ?? 0,
-      'created_at': raw['installdate']?.toString() ??
-          raw['commdate']?.toString() ?? '',
+      'created_at':
+          raw['installdate']?.toString() ?? raw['commdate']?.toString() ?? '',
       'updated_at': raw['changedate']?.toString() ?? '',
       'responsible_person': raw['responsible']?.toString().trim() ?? '',
     };
@@ -541,6 +543,8 @@ class DataExchangeScreen extends StatelessWidget {
         ? DateTime.now()
         : DateTime.tryParse(raw['updated_at']?.toString() ?? '') ??
             DateTime.now();
+    final qrCodeData =
+        (raw['qr_code_data'] ?? raw['qrCodeData'])?.toString().trim();
     return Item(
       id: intId,
       name: name,
@@ -562,6 +566,8 @@ class DataExchangeScreen extends StatelessWidget {
       category: cat?.key ?? base?.category,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      qrCodeData:
+          qrCodeData?.isNotEmpty == true ? qrCodeData : base?.qrCodeData,
     );
   }
 
@@ -571,8 +577,8 @@ class DataExchangeScreen extends StatelessWidget {
       return kCategories.firstWhere((c) => c.key == name);
     } catch (_) {}
     try {
-      return kCategories.firstWhere(
-          (c) => name.toLowerCase().contains(c.name.toLowerCase()));
+      return kCategories
+          .firstWhere((c) => name.toLowerCase().contains(c.name.toLowerCase()));
     } catch (_) {
       return null;
     }

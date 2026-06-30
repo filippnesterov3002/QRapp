@@ -28,6 +28,9 @@ class Item extends HiveObject {
   final DateTime? createdAt; // Дата создания предмета
   @HiveField(11)
   final DateTime? updatedAt; // Дата последнего изменения
+  @HiveField(12)
+  final String? qrCodeData; // Данные созданного QR-кода
+
   Item({
     required this.id,
     required this.name,
@@ -41,7 +44,43 @@ class Item extends HiveObject {
     this.category,
     this.createdAt,
     this.updatedAt,
+    this.qrCodeData,
   });
+
+  bool get hasQrCode => qrCodeData?.trim().isNotEmpty == true;
+
+  Item copyWith({
+    int? id,
+    String? name,
+    String? description,
+    Location? location,
+    int? quantity,
+    String? imagePath,
+    bool clearImagePath = false,
+    String? inventoryNumber,
+    String? responsiblePerson,
+    String? itemId,
+    String? category,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? qrCodeData,
+  }) {
+    return Item(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      location: location ?? this.location,
+      quantity: quantity ?? this.quantity,
+      imagePath: clearImagePath ? null : (imagePath ?? this.imagePath),
+      inventoryNumber: inventoryNumber ?? this.inventoryNumber,
+      responsiblePerson: responsiblePerson ?? this.responsiblePerson,
+      itemId: itemId ?? this.itemId,
+      category: category ?? this.category,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      qrCodeData: qrCodeData ?? this.qrCodeData,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -54,6 +93,7 @@ class Item extends HiveObject {
         'responsiblePerson': responsiblePerson,
         'itemId': itemId,
         'category': category,
+        'qrCodeData': qrCodeData,
       };
 }
 

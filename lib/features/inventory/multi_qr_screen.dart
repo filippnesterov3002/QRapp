@@ -42,15 +42,13 @@ class _MultiQrScreenState extends State<MultiQrScreen> {
       final boundary = _qrKeys[index].currentContext!.findRenderObject()!
           as RenderRepaintBoundary;
       final img = await boundary.toImage(pixelRatio: 3.0);
-      final byteData =
-          await img.toByteData(format: ui.ImageByteFormat.png);
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
       final pngBytes = byteData!.buffer.asUint8List();
       await Gal.putImageBytes(pngBytes);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  'QR ${widget.items[index].itemId ?? ''} сохранён')),
+              content: Text('QR ${widget.items[index].itemId ?? ''} сохранён')),
         );
       }
     } catch (e) {
@@ -94,8 +92,8 @@ class _MultiQrScreenState extends State<MultiQrScreen> {
         ),
         title: Text(
           'QR-коды (${widget.items.length} шт.)',
-          style: const TextStyle(
-              color: Colors.black, fontWeight: FontWeight.w600),
+          style:
+              const TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
         ),
         actions: [
           // Кнопка "Сохранить все"
@@ -123,8 +121,7 @@ class _MultiQrScreenState extends State<MultiQrScreen> {
               child: Row(
                 children: [
                   if (category != null) ...[
-                    Text(category.emoji,
-                        style: const TextStyle(fontSize: 24)),
+                    Text(category.emoji, style: const TextStyle(fontSize: 24)),
                     const SizedBox(width: 10),
                   ],
                   Expanded(
@@ -138,16 +135,16 @@ class _MultiQrScreenState extends State<MultiQrScreen> {
                         ),
                         Text(
                           item.location.room,
-                          style: const TextStyle(
-                              fontSize: 13, color: Colors.grey),
+                          style:
+                              const TextStyle(fontSize: 13, color: Colors.grey),
                         ),
                       ],
                     ),
                   ),
                   // Счётчик предметов
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: _kRed.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -172,8 +169,9 @@ class _MultiQrScreenState extends State<MultiQrScreen> {
               itemCount: widget.items.length,
               itemBuilder: (context, index) {
                 final it = widget.items[index];
-                final qrData =
-                    it.itemId?.isNotEmpty == true ? it.itemId! : it.name;
+                final qrData = it.qrCodeData?.trim().isNotEmpty == true
+                    ? it.qrCodeData!.trim()
+                    : it.itemId?.trim() ?? '';
                 return _QrCard(
                   item: it,
                   qrData: qrData,
@@ -227,12 +225,21 @@ class _QrCard extends StatelessWidget {
             child: Container(
               color: Colors.white,
               padding: const EdgeInsets.all(4),
-              child: QrImageView(
-                data: qrData,
-                version: QrVersions.auto,
-                size: 90,
-                backgroundColor: Colors.white,
-              ),
+              child: qrData.isEmpty
+                  ? const SizedBox(
+                      width: 90,
+                      height: 90,
+                      child: Center(
+                        child:
+                            Icon(Icons.qr_code_2, color: Colors.grey, size: 42),
+                      ),
+                    )
+                  : QrImageView(
+                      data: qrData,
+                      version: QrVersions.auto,
+                      size: 90,
+                      backgroundColor: Colors.white,
+                    ),
             ),
           ),
           const SizedBox(width: 14),
@@ -264,13 +271,13 @@ class _QrCard extends StatelessWidget {
           ),
           // Кнопка сохранения
           IconButton(
-            onPressed: saving ? null : onSave,
+            onPressed: saving || qrData.isEmpty ? null : onSave,
             icon: saving
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: _kRed),
+                    child:
+                        CircularProgressIndicator(strokeWidth: 2, color: _kRed),
                   )
                 : const Icon(Icons.download, color: _kRed, size: 22),
             tooltip: 'Сохранить в галерею',

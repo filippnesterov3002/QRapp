@@ -138,7 +138,7 @@ class WifiServer {
         'version': '1.0',
         'exported_at': DateFormat("yyyy-MM-dd'T'HH:mm:ss").format(now),
         'app': 'InventoryApp',
-        'axioma_compatible': true,   // поля совместимы с axioma.asset
+        'axioma_compatible': true, // поля совместимы с axioma.asset
         'items': items.map(_itemToJson).toList(),
         'total': items.length,
       });
@@ -182,7 +182,8 @@ class WifiServer {
       if (!isOurFormat && !isAxiomaFmt) {
         return _json({
           'status': 'error',
-          'message': 'Неверный формат файла. Поддерживается формат InventoryApp и Аксиома.'
+          'message':
+              'Неверный формат файла. Поддерживается формат InventoryApp и Аксиома.'
         });
       }
 
@@ -232,9 +233,8 @@ class WifiServer {
 
       // Генерация уникальных id
       final usedItemIds = existingById.keys.toSet();
-      int nextInt = box.isEmpty
-          ? 1
-          : box.values.map((i) => i.id).reduce(max) + 1;
+      int nextInt =
+          box.isEmpty ? 1 : box.values.map((i) => i.id).reduce(max) + 1;
 
       int added = 0;
       int updated = 0;
@@ -269,15 +269,16 @@ class WifiServer {
             base: existing,
           );
           await box.put(existing.key, updatedItem);
-          await ChangeLogService.logConflict(
-              existing, updatedItem, source: 'import_wifi');
+          await ChangeLogService.logConflict(existing, updatedItem,
+              source: 'import_wifi');
           updated++;
         }
       }
 
       final skipped =
           (dupAction == 'skip' || dupAction == null) ? duplicateIds.length : 0;
-      _logEvent('Загружен файл ($added новых, $updated обновлено, $skipped пропущено)');
+      _logEvent(
+          'Загружен файл ($added новых, $updated обновлено, $skipped пропущено)');
 
       return _json({
         'status': 'ok',
@@ -318,17 +319,18 @@ class WifiServer {
     final cat = categoryByKey(item.category);
     return {
       // Поля axioma.asset — совместимый формат
-      'assetnum':         item.itemId ?? '',
-      'x_inventarnum':    item.itemId ?? '',
-      'description':      item.name,
+      'assetnum': item.itemId ?? '',
+      'x_inventarnum': item.itemId ?? '',
+      'description': item.name,
       'classstructureid': item.category ?? '',
-      'reatroom':         item.location.room.trim(),
-      'location':         item.location.room.trim(),
-      'orderqty':         item.quantity ?? 0,
-      'installdate':      item.createdAt?.toIso8601String() ?? '',
-      'changedate':       item.updatedAt?.toIso8601String() ?? '',
+      'reatroom': item.location.room.trim(),
+      'location': item.location.room.trim(),
+      'orderqty': item.quantity ?? 0,
+      'installdate': item.createdAt?.toIso8601String() ?? '',
+      'changedate': item.updatedAt?.toIso8601String() ?? '',
       // Вспомогательное поле: читаемое название категории
-      '_category_name':   cat?.name ?? '',
+      '_category_name': cat?.name ?? '',
+      'qr_code_data': item.qrCodeData ?? '',
     };
   }
 
@@ -352,6 +354,8 @@ class WifiServer {
         ? DateTime.now()
         : DateTime.tryParse(raw['updated_at']?.toString() ?? '') ??
             DateTime.now();
+    final qrCodeData =
+        (raw['qr_code_data'] ?? raw['qrCodeData'])?.toString().trim();
 
     return Item(
       id: intId,
@@ -374,6 +378,8 @@ class WifiServer {
       category: cat?.key ?? base?.category,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      qrCodeData:
+          qrCodeData?.isNotEmpty == true ? qrCodeData : base?.qrCodeData,
     );
   }
 
@@ -418,22 +424,24 @@ class WifiServer {
 
     // Помещение: предпочитаем reatroom → axiroom → location (код)
     final room = (raw['reatroom']?.toString().trim().isNotEmpty == true
-            ? raw['reatroom']
-            : raw['axiroom']?.toString().trim().isNotEmpty == true
-                ? raw['axiroom']
-                : raw['location'])
-        ?.toString()
-        .trim() ?? '';
+                ? raw['reatroom']
+                : raw['axiroom']?.toString().trim().isNotEmpty == true
+                    ? raw['axiroom']
+                    : raw['location'])
+            ?.toString()
+            .trim() ??
+        '';
 
     return {
-      'item_id':    raw['assetnum']?.toString().trim() ??
-                    raw['x_inventarnum']?.toString().trim() ?? '',
-      'name':       raw['description']?.toString().trim() ?? '',
-      'category':   raw['classstructureid']?.toString().trim() ?? '',
-      'location':   room,
-      'quantity':   raw['orderqty'] ?? raw['quantity'] ?? 0,
-      'created_at': raw['installdate']?.toString() ??
-                    raw['commdate']?.toString() ?? '',
+      'item_id': raw['assetnum']?.toString().trim() ??
+          raw['x_inventarnum']?.toString().trim() ??
+          '',
+      'name': raw['description']?.toString().trim() ?? '',
+      'category': raw['classstructureid']?.toString().trim() ?? '',
+      'location': room,
+      'quantity': raw['orderqty'] ?? raw['quantity'] ?? 0,
+      'created_at':
+          raw['installdate']?.toString() ?? raw['commdate']?.toString() ?? '',
       'updated_at': raw['changedate']?.toString() ?? '',
       'responsible_person': raw['responsible']?.toString().trim() ?? '',
     };
