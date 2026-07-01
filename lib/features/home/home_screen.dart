@@ -8,6 +8,8 @@ import '../../models/inventory_session.dart';
 import '../../models/items.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
+import '../ai/chat_ui.dart';
+import '../ai/inventory_agent.dart';
 import '../history/global_history_screen.dart';
 import '../inventory/new_inventory_screen.dart';
 import '../reports/reports_screen.dart';
@@ -23,6 +25,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController _searchController = TextEditingController();
+  late final InventoryAgent _inventoryAgent;
   String _searchQuery = '';
 
   // Ящик Hive — открыт в main.dart, просто берём ссылку
@@ -31,6 +34,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _inventoryAgent = InventoryAgent.createDefault();
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
@@ -41,6 +45,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _inventoryAgent.dispose();
     super.dispose();
   }
 
@@ -49,9 +54,7 @@ class _HomePageState extends State<HomePage> {
     return all
         .where((item) =>
             item.name.toLowerCase().contains(_searchQuery) ||
-            (item.inventoryNumber
-                    ?.toLowerCase()
-                    .contains(_searchQuery) ??
+            (item.inventoryNumber?.toLowerCase().contains(_searchQuery) ??
                 false) ||
             item.location.room.toLowerCase().contains(_searchQuery))
         .toList();
@@ -61,6 +64,14 @@ class _HomePageState extends State<HomePage> {
   void _onItemAdded(Item item) {
     _box.add(item);
     // ValueListenableBuilder перестроит UI автоматически
+  }
+
+  void _openAgentChat() {
+    Navigator.pop(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showInventoryAgentChat(context, _inventoryAgent);
+    });
   }
 
   @override
@@ -217,6 +228,11 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                     children: [
                       _DrawerItem(
+                        title: 'ИИ-агент',
+                        onTap: _openAgentChat,
+                      ),
+                      const SizedBox(height: 12),
+                      _DrawerItem(
                         title: 'Инвентаризация',
                         onTap: () {
                           Navigator.pop(context);
@@ -273,8 +289,7 @@ class _HomePageState extends State<HomePage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) =>
-                                      const GlobalHistoryScreen()),
+                                  builder: (_) => const GlobalHistoryScreen()),
                             );
                           },
                         ),
@@ -346,15 +361,12 @@ class _DrawerStats extends StatelessWidget {
     final itemCount = itemsBox.length;
 
     // Количество уникальных помещений
-    final roomCount = itemsBox.values
-        .map((e) => e.location.room.trim())
-        .toSet()
-        .length;
+    final roomCount =
+        itemsBox.values.map((e) => e.location.room.trim()).toSet().length;
 
     // Завершённые инвентаризации
-    final completedSessions = sessionsBox.values
-        .where((s) => s.status == 'completed')
-        .toList();
+    final completedSessions =
+        sessionsBox.values.where((s) => s.status == 'completed').toList();
     final sessionCount = completedSessions.length;
 
     // Дата последней завершённой сессии
@@ -390,14 +402,11 @@ class _DrawerStats extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               // Строки статистики
-              _StatRow(emoji: '📦', label: 'Предметов',
-                  value: '$itemCount'),
-              _StatRow(emoji: '🚪', label: 'Помещений',
-                  value: '$roomCount'),
-              _StatRow(emoji: '📋', label: 'Инвентаризаций',
-                  value: '$sessionCount'),
-              _StatRow(emoji: '📅', label: 'Последняя',
-                  value: lastDateStr),
+              _StatRow(emoji: '📦', label: 'Предметов', value: '$itemCount'),
+              _StatRow(emoji: '🚪', label: 'Помещений', value: '$roomCount'),
+              _StatRow(
+                  emoji: '📋', label: 'Инвентаризаций', value: '$sessionCount'),
+              _StatRow(emoji: '📅', label: 'Последняя', value: lastDateStr),
             ],
           ),
         ),
